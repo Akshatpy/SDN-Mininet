@@ -1,0 +1,604 @@
+# Packet Drop Simulator - SDN Flow Rules Implementation
+
+## Project Overview
+
+This project implements a **Packet Drop Simulator** using Software-Defined Networking (SDN) principles. It demonstrates how to selectively drop packets using OpenFlow flow rules in a Mininet network simulation environment.
+
+### Learning Objectives
+- Implement SDN controller logic with OpenFlow 1.3
+- Design and install flow rules for packet manipulation
+- Simulate packet loss in a controlled network environment
+- Measure and verify packet dropping behavior
+- Implement regression testing for drop rule persistence
+
+---
+
+## Problem Statement
+
+Create an SDN-based solution that allows selective packet dropping based on flow rules. The system must:
+
+1. **Install Drop Rules**: Programmatically install OpenFlow rules that drop packets
+2. **Select Specific Flows**: Choose which traffic to drop (e.g., source IP, destination IP, protocol)
+3. **Measure Packet Loss**: Quantify the impact of drop rules using ping and throughput tests
+4. **Evaluate Behavior**: Demonstrate normal vs. dropped traffic scenarios
+5. **Regression Test**: Verify that drop rules persist correctly over time
+
+---
+
+## Assignment Requirements
+
+✅ **Environment Setup**
+- Mininet for network topology simulation
+- Ryu/POX as OpenFlow controller
+- Ubuntu/Linux (Windows WSL2 compatible)
+
+✅ **Implementation Requirements**
+- Explicit OpenFlow flow rules (match-action rules)
+- Controller logic for packet_in event handling
+- Functional demonstration using standard tools (ping, iperf)
+
+✅ **Testing & Validation**
+- 2+ test scenarios (normal connectivity, packet dropping)
+- Measurement metrics (latency, packet loss)
+- Regression tests (drop rule persistence)
+
+✅ **Deliverables**
+- Working Mininet code
+- SDN controller implementation
+- Test suite and measurement scripts
+- GitHub repository with documentation
+- README with setup/execution steps
+- Proof of execution (screenshots, logs)
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│           Mininet Network Topology                  │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│   ┌───┐    ┌───┐    ┌───┐    ┌───┐               │
+│   │h1 │    │h2 │    │h3 │    │h4 │               │
+│   │   │    │   │    │   │    │   │               │
+│   └─┬─┘    └─┬─┘    └─┬─┘    └─┬─┘               │
+│     │        │        │        │                 │
+│     └────────┴────────┴────────┘                 │
+│              │                                    │
+│           ┌──┴──┐                                │
+│           │ s1  │ (OpenFlow Switch)             │
+│           └──┬──┘                                │
+│              │                                    │
+│     ┌────────┴────────┐                          │
+│     │ Controller      │                          │
+│     │ (Ryu/POX)       │                          │
+│     │ Port: 6633      │                          │
+│     └─────────────────┘                          │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+
+OpenFlow Rules Flow:
+┌──────────┐  packet_in  ┌─────────────┐
+│ Switch   ├────────────→│ Controller  │
+│ s1       │             │ (Ryu)       │
+└──────────┤             └─────────────┘
+           ↑             │
+           │  flow_mod   │
+           └─────────────┘
+
+Drop Rule Example:
+Priority: 100
+Match: ip_src=10.0.0.1, ip_dst=10.0.0.2, protocol=ICMP
+Actions: (empty) → DROP
+```
+
+---
+
+## File Structure
+
+```
+SDN_Mininet/
+├── packet_drop_simulator.py          # Main Mininet topology and CLI
+├── ryu_packet_drop_controller.py     # Ryu OpenFlow controller logic
+├── test_packet_drop.py               # Comprehensive test suite
+├── README.md                         # This file
+└── setup_environment.sh              # Setup script (optional)
+```
+
+---
+
+## Installation & Setup
+
+### Prerequisites
+
+**Supported Platforms:**
+- Ubuntu 20.04 / 22.04 (native or WSL2 on Windows)
+- Python 3.7+
+- Root/sudo access required
+
+### Step 1: Install Mininet
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Method 1: Quick installation (Recommended)
+sudo apt install mininet -y
+
+# Method 2: From source (if needed)
+git clone https://github.com/mininet/mininet
+cd mininet
+sudo ./util/install.sh -a
+```
+
+### Step 2: Install Ryu Controller
+
+```bash
+# Install Ryu
+sudo pip3 install ryu
+
+# Verify installation
+ryu-manager --version
+```
+
+### Step 3: Clone and Setup Project
+
+```bash
+# Navigate to project directory
+cd ~/Desktop/SDN_Mininet
+
+# (Optional) Create Python virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install additional dependencies
+pip3 install scapy mininet ryu networkx requests
+```
+
+### Step 4: Verify Installation
+
+```bash
+# Check Mininet
+sudo mn --version
+
+# Check Ryu
+ryu-manager --version
+
+# Check Python packages
+python3 -c "import mininet; import ryu; print('All packages installed!')"
+```
+
+---
+
+## Running the Project
+
+### Quick Start (4 Terminal Windows)
+
+#### Terminal 1: Clean Mininet
+```bash
+# Clear any previous Mininet instances
+sudo mn -c
+```
+
+#### Terminal 2: Start Ryu Controller
+```bash
+cd ~/Desktop/SDN_Mininet
+ryu-manager ryu_packet_drop_controller.py --observe-links
+```
+
+Expected output:
+```
+loading app ryu.topology.switches ...
+loading app ryu.topology.lldp ...
+loading app packet_drop_controller ...
+[*] Packet Drop Controller initialized
+```
+
+#### Terminal 3: Start Mininet Simulator
+```bash
+# Using WSL/Ubuntu
+sudo python3 packet_drop_simulator.py
+
+# Or without WSL
+python3 packet_drop_simulator.py
+```
+
+Expected output:
+```
+[*] Creating network topology...
+[+] Topology created successfully!
+[+] Hosts: h1 (10.0.0.1), h2 (10.0.0.2), h3 (10.0.0.3), h4 (10.0.0.4)
+[+] Switch: s1 (dpid=0000000000000001)
+[*] Starting network...
+[+] Network started!
+```
+
+#### Terminal 4: Run Test Suite
+```bash
+python3 test_packet_drop.py
+```
+
+---
+
+## Test Scenarios
+
+### Test Scenario 1: Normal Connectivity (No Drops)
+
+**Objective:** Verify normal network behavior without drop rules
+
+**Steps:**
+```bash
+# In Terminal 3 (Mininet CLI), select option 1 or run:
+mininet> h1 ping -c 5 10.0.0.2
+mininet> h3 ping -c 5 10.0.0.4
+```
+
+**Expected Output:**
+```
+PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=1.23 ms
+64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=1.45 ms
+64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=1.32 ms
+64 bytes from 10.0.0.2: icmp_seq=4 ttl=64 time=1.56 ms
+
+--- 10.0.0.2 statistics ---
+4 packets transmitted, 4 received, 0% packet loss
+```
+
+**Interpretation:**
+- ✅ All packets successfully transmitted and received
+- ✅ Latency is stable (1-2 ms range)
+- ✅ 0% packet loss confirms normal forwarding
+
+---
+
+### Test Scenario 2: Packet Dropping Enabled
+
+**Objective:** Verify that drop rules successfully prevent traffic
+
+**Setup:**
+1. In the Ryu controller, uncomment drop rule (search for `enable_drop_rule`)
+2. Or modify the configuration to enable drops:
+
+```python
+# In ryu_packet_drop_controller.py, modify:
+self.drop_rules_config = {
+    ('10.0.0.1', '10.0.0.2'): True,  # h1 -> h2 DROPS
+    ('10.0.0.3', '10.0.0.4'): False,
+}
+```
+
+**Steps:**
+```bash
+# In Terminal 3 (Mininet CLI), run:
+mininet> h1 ping -c 5 10.0.0.2
+```
+
+**Expected Output:**
+```
+PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+
+--- 10.0.0.2 statistics ---
+5 packets transmitted, 0 received, 100% packet loss
+```
+
+**Verification:**
+```bash
+# In Terminal 1, verify flow rules:
+sudo ovs-ofctl dump-flows s1
+```
+
+Expected flow table:
+```
+OFPST_FLOW reply (xid=0x2):
+ cookie=0x0, duration=45.123s, table=0, n_packets=10, n_bytes=840,
+ priority=100,ip,nw_src=10.0.0.1,nw_dst=10.0.0.2 actions=drop
+```
+
+**Interpretation:**
+- ✅ All packets dropped (100% loss)
+- ✅ Drop rule installed at priority 100
+- ✅ No ICMP replies received (as expected)
+
+---
+
+### Regression Test: Drop Rule Persistence
+
+**Objective:** Verify drop rules remain active and don't disappear
+
+**Steps:**
+
+```bash
+# Step 1: Enable drop rule
+mininet> h1 ping -c 10 10.0.0.2
+
+# Step 2: Check flows (Terminal 1)
+sudo ovs-ofctl dump-flows s1
+
+# Step 3: Wait 30 seconds and send more packets
+mininet> h1 ping -c 5 10.0.0.2
+
+# Step 4: Verify drop rule still present (Terminal 1)
+sudo ovs-ofctl dump-flows s1
+
+# Step 5: Check idle/hard timeouts (should still show the rule)
+# Note: If using hard_timeout=60, rule will expire after 60 seconds
+```
+
+**Success Criteria:**
+- ✅ Drop rule persists across multiple test runs
+- ✅ Packet loss remains at 100% throughout test
+- ✅ Flow counters increase (n_packets, n_bytes)
+- ✅ Drop rule expires only after configured timeout
+
+---
+
+## Packet Loss Measurement
+
+### Using Ping
+
+```bash
+# Simple loss percentage
+mininet> h1 ping -c 100 10.0.0.2 | grep "% packet loss"
+
+# Detailed statistics
+mininet> h1 ping -c 100 10.0.0.2
+```
+
+### Using iperf (Throughput)
+
+```bash
+# Terminal 1: Start iperf server on h2
+mininet> h2 iperf -s
+
+# Terminal 2: Run iperf client from h1
+mininet> h1 iperf -c 10.0.0.2 -t 10
+
+# With drop rule enabled, bandwidth should be 0 Mbit/sec
+```
+
+### Using Wireshark (Packet Capture)
+
+```bash
+# Capture packets on interface
+sudo wireshark &
+
+# Or command-line capture
+sudo tcpdump -i s1-eth1 -w capture.pcap
+
+# Filter for specific traffic
+tcpdump -r capture.pcap "src 10.0.0.1 and dst 10.0.0.2"
+```
+
+---
+
+## OpenFlow Flow Rules Explained
+
+### Flow Rule Components
+
+```
+Priority: 100
+├─ Match:
+│  ├─ eth_type: 0x0800 (IPv4)
+│  ├─ ipv4_src: 10.0.0.1
+│  └─ ipv4_dst: 10.0.0.2
+└─ Actions: (empty/DROP)
+```
+
+### Rule Priority
+
+- **Priority 100**: Drop rules (evaluated first)
+- **Priority 1**: Learning switch forwarding rules
+- **Priority 0**: Table-miss rule (sends to controller)
+
+Higher priority = evaluated first
+
+### Example Flow Rules
+
+**Rule 1: Drop h1→h2 traffic**
+```
+priority=100,ip,nw_src=10.0.0.1,nw_dst=10.0.0.2 actions=drop
+```
+
+**Rule 2: Forward to h2**
+```
+priority=1,dl_dst=00:00:00:00:00:02 actions=output:2
+```
+
+**Rule 3: Table-miss (to controller)**
+```
+priority=0 actions=CONTROLLER:65535
+```
+
+---
+
+## Viewing Flow Tables
+
+### Display All Flows
+```bash
+sudo ovs-ofctl dump-flows s1
+```
+
+### Display Flows with Details
+```bash
+sudo ovs-ofctl dump-flows s1 -O OpenFlow13
+```
+
+### Clear All Flows
+```bash
+sudo ovs-ofctl del-flows s1
+```
+
+### Delete Specific Flow
+```bash
+sudo ovs-ofctl del-flows s1 "priority=100"
+```
+
+---
+
+## Monitoring and Debugging
+
+### View Controller Logs
+
+```bash
+# Terminal 2 (where controller runs)
+# Logs show:
+# [*] Packet Drop Controller initialized
+# [+] Switch connected: dpid=0x0000000000000001
+# [DROP] Dropping traffic: 10.0.0.1 -> 10.0.0.2
+```
+
+### View Switch Statistics
+
+```bash
+# Monitor flow statistics
+watch -n 1 'sudo ovs-ofctl dump-flows s1'
+
+# Port statistics
+sudo ovs-ofctl dump-ports s1
+
+# Flow statistics with more detail
+sudo ovs-ofctl dump-flows s1 | grep -E "priority|n_packets|n_bytes"
+```
+
+### Common Issues & Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "no flow table" | Controller not connected | Verify Ryu is running, check IP:port |
+| 0% packet loss with drop rule | Rule not installed | Check controller logs, verify priority |
+| Cannot ping h1 to h2 | No forwarding rule | Ensure controller sends first packet to establish MAC learning |
+| "ovs-ofctl: s1: no such device" | Switch down | Ensure Mininet is running |
+
+---
+
+## Expected Behavior Summary
+
+| Scenario | Expected Loss | Measurement |
+|----------|--------------|-------------|
+| Normal (no rules) | 0% | All pings reply, ping -c 5 = 5 replies |
+| Drop rule enabled | 100% | No pings reply, ping -c 5 = 0 replies |
+| Rule persistence | 100% (maintained) | 30+ consecutive pings = 0 replies |
+
+---
+
+## Performance Observations
+
+### Normal Connectivity
+- **Latency**: 1-5 ms (typical for local network)
+- **Throughput**: ~1 Gbps (limited by Mininet, not network)
+- **Packet Loss**: 0%
+
+### With Drop Rules
+- **Latency**: N/A (packets dropped immediately)
+- **Throughput**: 0 Mbps (no traffic forwarded)
+- **Packet Loss**: 100%
+
+---
+
+## Code Walkthrough
+
+### Controller Flow Handling
+
+```python
+@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+def packet_in_handler(self, ev):
+    # 1. Extract packet and metadata
+    msg = ev.msg
+    datapath = msg.datapath
+    pkt = packet.Packet(msg.data)
+    
+    # 2. Parse protocols
+    ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+    
+    # 3. Check drop rules
+    if self._should_drop_flow(ipv4_pkt.src, ipv4_pkt.dst):
+        # 4. Install DROP rule
+        self.add_flow(datapath, 100, match, [], ...)
+        return  # Don't forward
+    
+    # 5. Normal forwarding (learning switch)
+    self._handle_normal_forwarding(...)
+```
+
+### Flow Rule Installation
+
+```python
+def add_flow(self, datapath, priority, match, actions):
+    ofproto = datapath.ofproto
+    parser = datapath.ofproto_parser
+    
+    # Create instruction
+    inst = [parser.OFPInstructionActions(
+        ofproto.OFPIT_APPLY_ACTIONS, actions
+    )]
+    
+    # Create flow rule
+    mod = parser.OFPFlowMod(
+        datapath=datapath,
+        priority=priority,
+        match=match,
+        instructions=inst
+    )
+    
+    # Send to switch
+    datapath.send_msg(mod)
+```
+
+---
+
+## Validation Checklist
+
+- [ ] Mininet topology created (s1, h1, h2, h3, h4 visible)
+- [ ] Ryu controller connects (logs show "Switch connected")
+- [ ] Normal ping works (0% packet loss)
+- [ ] Drop rule installs correctly (ovs-ofctl shows rule)
+- [ ] Packet loss with drop rule (100% loss)
+- [ ] Drop rule persists (multiple test iterations)
+- [ ] Flow counters increment (n_packets, n_bytes increase)
+- [ ] Controller handles all packet_in events
+- [ ] Regression test passes (drop rule doesn't disappear)
+
+---
+
+## References
+
+1. **Mininet Documentation**: http://mininet.org/
+2. **Ryu Documentation**: https://ryu.readthedocs.io/
+3. **OpenFlow 1.3 Specification**: https://opennetworking.org/
+4. **Open vSwitch**: http://openvswitch.org/
+5. **SDN Concepts**: https://www.sdxcentral.com/
+
+---
+
+## Author
+
+Student Implementation for SDN Assignment: Packet Drop Simulator
+
+## License
+
+Educational use only
+
+## Submission
+
+**GitHub Repository**: [Your GitHub Link]
+- Source code (all .py files)
+- README.md
+- Setup instructions
+- Test results and proof of execution
+
+---
+
+## Contact & Support
+
+For issues or questions:
+1. Check the debugging section above
+2. Review controller logs
+3. Verify network connectivity with `mininet> net`
+4. Check flow tables with `sudo ovs-ofctl dump-flows s1`
+
+---
+
+**Last Updated**: 2024
+**Version**: 1.0
