@@ -41,15 +41,6 @@ Create an SDN-based solution that allows selective packet dropping based on flow
 │                                                     │
 └─────────────────────────────────────────────────────┘
 
-OpenFlow Rules Flow:
-┌──────────┐  packet_in  ┌─────────────┐
-│ Switch   ├────────────→│ Controller  │
-│ s1       │             │ (Ryu)       │
-└──────────┤             └─────────────┘
-           ↑             │
-           │  flow_mod   │
-           └─────────────┘
-
 Drop Rule Example:
 Priority: 100
 Match: ip_src=10.0.0.1, ip_dst=10.0.0.2, protocol=ICMP
@@ -207,14 +198,6 @@ sudo ovs-ofctl dump-flows s1
 # Note: If using hard_timeout=60, rule will expire after 60 seconds
 ```
 
-**Success Criteria:**
-- ✅ Drop rule persists across multiple test runs
-- ✅ Packet loss remains at 100% throughout test
-- ✅ Flow counters increase (n_packets, n_bytes)
-- ✅ Drop rule expires only after configured timeout
-
----
-
 ## Packet Loss Measurement
 
 ### Using Ping
@@ -322,26 +305,3 @@ sudo ovs-ofctl dump-ports s1
 sudo ovs-ofctl dump-flows s1 | grep -E "priority|n_packets|n_bytes"
 ```
 ### Controller Flow Handling
-
-```python
-@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
-def packet_in_handler(self, ev):
-    # 1. Extract packet and metadata
-    msg = ev.msg
-    datapath = msg.datapath
-    pkt = packet.Packet(msg.data)
-    
-    # 2. Parse protocols
-    ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
-    
-    # 3. Check drop rules
-    if self._should_drop_flow(ipv4_pkt.src, ipv4_pkt.dst):
-        # 4. Install DROP rule
-        self.add_flow(datapath, 100, match, [], ...)
-        return  # Don't forward
-    
-    # 5. Normal forwarding (learning switch)
-    self._handle_normal_forwarding(...)
-```
-
-
