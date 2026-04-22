@@ -1,0 +1,2 @@
+Requirement already satisfied: pbr==5.8.1 in /root/SDN_Mininet/.venv/lib/python3.12/site-packages (5.8.1)
+Requirement already satisfied: setuptools in /root/SDN_Mininet/.venv/lib/python3.12/site-packages (58.0.4)

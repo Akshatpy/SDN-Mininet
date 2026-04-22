@@ -95,7 +95,7 @@ class PacketDropController(app_manager.RyuApp):
         
         if eth.ethertype == ETH_TYPE_ARP:
             # Handle ARP
-            self._handle_arp(datapath, pkt, eth, in_port, parser, ofproto)
+            self._handle_arp(datapath, pkt, eth, in_port, parser, ofproto, msg)
         
         elif eth.ethertype == ETH_TYPE_IP:
             # Handle IP packets
@@ -104,7 +104,7 @@ class PacketDropController(app_manager.RyuApp):
                 self._handle_ipv4(datapath, pkt, ipv4_pkt, in_port,
                                  parser, ofproto, msg)
     
-    def _handle_arp(self, datapath, pkt, eth, in_port, parser, ofproto):
+    def _handle_arp(self, datapath, pkt, eth, in_port, parser, ofproto, msg):
         """Handle ARP packets - flood them"""
         actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
         data = None

@@ -19,6 +19,28 @@ from mininet.link import TCLink
 import subprocess
 import time
 
+
+def enable_drop_rule_on_switch(src_ip='10.0.0.1', dst_ip='10.0.0.2'):
+    """Install a high-priority OpenFlow drop rule for a specific IPv4 flow."""
+    flow = f"priority=200,ip,nw_src={src_ip},nw_dst={dst_ip},actions=drop"
+    result = subprocess.run(
+        ['ovs-ofctl', '-O', 'OpenFlow13', 'add-flow', 's1', flow],
+        capture_output=True,
+        text=True
+    )
+    return result.returncode == 0, (result.stderr or result.stdout).strip()
+
+
+def disable_drop_rule_on_switch(src_ip='10.0.0.1', dst_ip='10.0.0.2'):
+    """Remove only the previously installed drop rule, keep other rules intact."""
+    flow_match = f"priority=200,ip,nw_src={src_ip},nw_dst={dst_ip}"
+    result = subprocess.run(
+        ['ovs-ofctl', '-O', 'OpenFlow13', '--strict', 'del-flows', 's1', flow_match],
+        capture_output=True,
+        text=True
+    )
+    return result.returncode == 0, (result.stderr or result.stdout).strip()
+
 def create_topology():
     """
     Create a simple network topology:
@@ -115,7 +137,7 @@ def show_flow_tables(net):
     
     # Use ovs-ofctl to display flows
     result = subprocess.run(
-        ['ovs-ofctl', 'dump-flows', 's1'],
+        ['ovs-ofctl', '-O', 'OpenFlow13', 'dump-flows', 's1'],
         capture_output=True,
         text=True
     )
@@ -166,14 +188,20 @@ def main():
                 test_connectivity(net, drop_enabled=False)
             elif choice == '2':
                 print("\n[*] Enabling DROP rule for h1 -> h2 traffic...")
-                print("[*] This should be handled by the controller.")
-                print("[!] Make sure your controller implements drop rules!")
+                ok, msg = enable_drop_rule_on_switch('10.0.0.1', '10.0.0.2')
+                if ok:
+                    print("[+] DROP rule installed on switch s1")
+                else:
+                    print(f"[!] Failed to install DROP rule: {msg}")
                 time.sleep(1)
                 test_connectivity(net, drop_enabled=True)
             elif choice == '3':
                 print("\n[*] Disabling DROP rule...")
-                subprocess.run(['ovs-ofctl', 'del-flows', 's1'], capture_output=True)
-                print("[+] All flows cleared")
+                ok, msg = disable_drop_rule_on_switch('10.0.0.1', '10.0.0.2')
+                if ok:
+                    print("[+] DROP rule removed")
+                else:
+                    print(f"[!] Failed to remove DROP rule: {msg}")
             elif choice == '4':
                 show_flow_tables(net)
             elif choice == '5':

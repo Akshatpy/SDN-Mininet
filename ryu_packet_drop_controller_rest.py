@@ -12,7 +12,7 @@ This controller adds:
 """
 
 from ryu.base import app_manager
-from ryu.controller import ofp_event, rest
+from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, ipv4, arp, icmp
@@ -39,14 +39,14 @@ class PacketDropControllerREST(ControllerBase):
         super(PacketDropControllerREST, self).__init__(req, link, data, **config)
         self.packet_drop_app = data['packet_drop_app']
     
-    @route('dropcontrol/flows', methods=['GET'])
+    @route('dropcontrol', '/dropcontrol/flows', methods=['GET'])
     def get_flows(self, req, **kwargs):
         """Get current drop rules status"""
         body = json.dumps(self.packet_drop_app.get_drop_rules_status_json(),
                          indent=2)
-        return Response(content_type='application/json', body=body)
+        return Response(content_type='application/json', charset='utf-8', body=body)
     
-    @route('dropcontrol/flows/enable', methods=['POST'])
+    @route('dropcontrol', '/dropcontrol/flows/enable', methods=['POST'])
     def enable_drop_rule(self, req, **kwargs):
         """Enable drop rule"""
         try:
@@ -64,13 +64,13 @@ class PacketDropControllerREST(ControllerBase):
                 'dst_ip': dst_ip
             }
             body = json.dumps(response_data, indent=2)
-            return Response(content_type='application/json', body=body)
+            return Response(content_type='application/json', charset='utf-8', body=body)
         except Exception as e:
             response_data = {'success': False, 'error': str(e)}
             body = json.dumps(response_data, indent=2)
-            return Response(content_type='application/json', body=body, status=400)
+            return Response(content_type='application/json', charset='utf-8', body=body, status=400)
     
-    @route('dropcontrol/flows/disable', methods=['POST'])
+    @route('dropcontrol', '/dropcontrol/flows/disable', methods=['POST'])
     def disable_drop_rule(self, req, **kwargs):
         """Disable drop rule"""
         try:
@@ -88,18 +88,18 @@ class PacketDropControllerREST(ControllerBase):
                 'dst_ip': dst_ip
             }
             body = json.dumps(response_data, indent=2)
-            return Response(content_type='application/json', body=body)
+            return Response(content_type='application/json', charset='utf-8', body=body)
         except Exception as e:
             response_data = {'success': False, 'error': str(e)}
             body = json.dumps(response_data, indent=2)
-            return Response(content_type='application/json', body=body, status=400)
+            return Response(content_type='application/json', charset='utf-8', body=body, status=400)
     
-    @route('dropcontrol/stats', methods=['GET'])
+    @route('dropcontrol', '/dropcontrol/stats', methods=['GET'])
     def get_statistics(self, req, **kwargs):
         """Get flow statistics"""
         stats = self.packet_drop_app.get_statistics_json()
         body = json.dumps(stats, indent=2)
-        return Response(content_type='application/json', body=body)
+        return Response(content_type='application/json', charset='utf-8', body=body)
 
 
 class PacketDropControllerAdvanced(app_manager.RyuApp):
@@ -124,10 +124,7 @@ class PacketDropControllerAdvanced(app_manager.RyuApp):
         
         # Setup REST API
         wsgi = kwargs['wsgi']
-        wsgi.register_instance(PacketDropControllerREST)
-        mapper = wsgi.mapper
-        mapper.connect('dropcontrol', '/dropcontrol/{action}',
-                      controller=PacketDropControllerREST, action='get_flows')
+        wsgi.register(PacketDropControllerREST, {'packet_drop_app': self})
         
         global _PACKET_DROP_CONTROLLER
         _PACKET_DROP_CONTROLLER = self
